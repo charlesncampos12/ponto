@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><script src="https://myhub.ia.br/canvas-vendor/tailwind.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Folha de Ponto</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 32px 16px;
+      background: #f4f7fb;
+      color: #182230;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .container { width: min(920px, 100%); margin: 0 auto; }
+    header { margin-bottom: 24px; }
+    .eyebrow {
+      color: #52647a;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    h1 { margin: 8px 0; font-size: clamp(28px, 5vw, 38px); }
+    .subtitle { margin: 0; color: #627086; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.15fr .85fr;
+      gap: 18px;
+    }
+    .card {
+      border: 1px solid #e4eaf1;
+      border-radius: 18px;
+      background: #fff;
+      padding: 22px;
+      box-shadow: 0 8px 28px rgba(27, 48, 75, .05);
+    }
+    .card h2 { margin: 0 0 18px; font-size: 18px; }
+    .clock {
+      margin: 4px 0 18px;
+      font-size: clamp(36px, 8vw, 54px);
+      font-weight: 750;
+      letter-spacing: -.04em;
+      font-variant-numeric: tabular-nums;
+    }
+    .today { color: #627086; font-size: 14px; }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 18px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: #eef5ff;
+      color: #245ca6;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+    .buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    button {
+      min-height: 52px;
+      padding: 12px 14px;
+      border: 0;
+      border-radius: 12px;
+      background: #1769e0;
+      color: white;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform .15s, opacity .15s, background .15s;
+    }
+    button:hover:not(:disabled) { background: #0e56c4; transform: translateY(-1px); }
+    button:disabled { background: #d7dee8; color: #78869a; cursor: not-allowed; }
+    .summary {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .metric {
+      padding: 16px;
+      border-radius: 14px;
+      background: #f6f8fb;
+    }
+    .metric-label { color: #68778c; font-size: 13px; }
+    .metric-value {
+      display: block;
+      margin-top: 7px;
+      font-size: 25px;
+      font-weight: 750;
+      font-variant-numeric: tabular-nums;
+    }
+    .history-card { margin-top: 18px; }
+    .report-card { margin-top: 18px; }
+    .target-field { display: flex; align-items: center; gap: 10px; margin: 0 0 16px; color: #52647a; font-size: 14px; }
+    .target-field input { width: 90px; padding: 9px 10px; border: 1px solid #d8e0ea; border-radius: 9px; color: #182230; font: inherit; }
+    .balance-positive { color: #16804a; }
+    .balance-negative { color: #c0392b; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th, td { padding: 13px 10px; border-bottom: 1px solid #edf0f4; }
+    th { color: #718096; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+    td { font-size: 14px; }
+    .empty { padding: 24px 10px; color: #78869a; text-align: center; }
+    .notice { margin: 14px 0 0; color: #7b8798; font-size: 12px; line-height: 1.5; }
+    @media (max-width: 680px) {
+      body { padding: 22px 12px; }
+      .grid { grid-template-columns: 1fr; }
+      .card { padding: 18px; }
+    }
+    @media (max-width: 420px) {
+      .buttons { grid-template-columns: 1fr; }
+      .summary { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <section class="card" id="loginCard" style="display:none; margin-bottom:18px;">
+      <h2>Entrar</h2>
+      <form id="loginForm" style="display:grid; gap:10px;">
+        <input id="loginEmail" type="email" placeholder="E-mail" required style="padding:10px; border:1px solid #d8e0ea; border-radius:9px; font:inherit;" />
+        <input id="loginPassword" type="password" placeholder="Senha" required style="padding:10px; border:1px solid #d8e0ea; border-radius:9px; font:inherit;" />
+        <button type="submit">Entrar</button>
+        <p id="loginError" style="margin:0; color:#c0392b; font-size:13px;"></p>
+      </form>
+    </section>
+    <header>
+      <div class="eyebrow">Controle diário</div>
+      <h1>Folha de ponto</h1>
+      <p class="subtitle">Registre seus horários de trabalho e acompanhe sua jornada.</p>
+    </header>
+
+    <section class="grid" aria-label="Painel de ponto">
+      <div class="card">
+        <h2>Registrar ponto</h2>
+        <div class="today" id="dateLabel"></div>
+        <div class="clock" id="clock">--:--:--</div>
+        <div class="buttons">
+          <button id="entryBtn" data-action="Entrada">Registrar entrada</button>
+          <button id="lunchOutBtn" data-action="Saída para almoço" disabled>Saída para almoço</button>
+          <button id="lunchInBtn" data-action="Volta do almoço" disabled>Volta do almoço</button>
+          <button id="exitBtn" data-action="Saída" disabled>Registrar saída</button>
+        </div>
+        <div class="status"><span class="dot"></span><span id="statusText">Aguardando início da jornada</span></div>
+      </div>
+
+      <div class="card">
+        <h2>Resumo de hoje</h2>
+        <div class="summary">
+          <div class="metric">
+            <span class="metric-label">Horas trabalhadas</span>
+            <strong class="metric-value" id="workedTime">00:00</strong>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Intervalo</span>
+            <strong class="metric-value" id="lunchTime">00:00</strong>
+          </div>
+        </div>
+        <p class="notice">O tempo de almoço é descontado do total trabalhado quando a volta do almoço é registrada.</p>
+      </div>
+    </section>
+
+    <section class="card history-card">
+      <h2>Registros de hoje</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Registro</th><th>Horário</th></tr>
+          </thead>
+          <tbody id="recordsBody">
+            <tr><td class="empty" colspan="2">Nenhum registro realizado ainda.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card report-card">
+      <h2>Relatório de saldo de horas</h2>
+      <label class="target-field" for="dailyTarget">
+        Jornada prevista por dia
+        <input id="dailyTarget" type="number" min="0" step="0.25" value="8" aria-label="Jornada prevista em horas por dia" />
+        <span>horas</span>
+      </label>
+      <div class="summary" style="margin-bottom: 18px;">
+        <div class="metric">
+          <span class="metric-label">Saldo de hoje</span>
+          <strong class="metric-value" id="dailyBalance">+00:00</strong>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Saldo total registrado</span>
+          <strong class="metric-value" id="totalBalance">+00:00</strong>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Data</th><th>Horas trabalhadas</th><th>Jornada prevista</th><th>Saldo do dia</th></tr>
+          </thead>
+          <tbody id="balanceBody">
+            <tr><td class="empty" colspan="4">Nenhum saldo registrado ainda.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="notice">O saldo é calculado pela diferença entre as horas trabalhadas e a jornada prevista. O total soma os dias registrados nesta sessão.</p>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <script>
+    const SUPABASE_URL = "https://gydnkhwdwcuhaaojfwck.supabase.co";
+    const SUPABASE_KEY = "sb_publishable__8puVCdXX7tMZ43ER5BTuA_2g0xt5n6";
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const records = [];
+    let currentUser = null;
+
+    async function loadToday() {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const { data, error } = await sb
+        .from("registros_ponto")
+        .select("tipo, registrado_em")
+        .gte("registrado_em", start.toISOString())
+        .order("registrado_em");
+      if (error) {
+        alert("Erro ao carregar registros: " + error.message);
+        return;
+      }
+      records.length = 0;
+      data.forEach(row => {
+        const date = new Date(row.registrado_em);
+        records.push({ label: row.tipo, date, time: formatTime(date) });
+      });
+      renderRecords();
+      refreshButtons();
+      updateSummary();
+    }
+
+    async function setLoggedIn(user) {
+      currentUser = user;
+      document.getElementById("loginCard").style.display = user ? "none" : "block";
+      if (user) {
+        await loadToday();
+      } else {
+        records.length = 0;
+        renderRecords();
+        refreshButtons();
+        updateSummary();
+      }
+    }
+
+    async function initAuth() {
+      const { data: { session } } = await sb.auth.getSession();
+      await setLoggedIn(session ? session.user : null);
+    }
+
+    document.getElementById("loginForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const email = document.getElementById("loginEmail").value.trim();
+      const password = document.getElementById("loginPassword").value;
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) {
+        document.getElementById("loginError").textContent = "E-mail ou senha inválidos.";
+        return;
+      }
+      document.getElementById("loginPassword").value = "";
+      document.getElementById("loginError").textContent = "";
+      await setLoggedIn(data.user);
+    });
+    const sequence = ["Entrada", "Saída para almoço", "Volta do almoço", "Saída"];
+    const buttons = {
+      "Entrada": document.getElementById("entryBtn"),
+      "Saída para almoço": document.getElementById("lunchOutBtn"),
+      "Volta do almoço": document.getElementById("lunchInBtn"),
+      "Saída": document.getElementById("exitBtn")
+    };
+
+    const pad = (value) => String(value).padStart(2, "0");
+
+    function formatTime(date) {
+      return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    }
+
+    function formatDuration(milliseconds) {
+      const totalMinutes = Math.max(0, Math.floor(milliseconds / 60000));
+      return `${pad(Math.floor(totalMinutes / 60))}:${pad(totalMinutes % 60)}`;
+    }
+
+    function updateClock() {
+      const now = new Date();
+      document.getElementById("clock").textContent = formatTime(now);
+      document.getElementById("dateLabel").textContent = new Intl.DateTimeFormat("pt-BR", {
+        weekday: "long", day: "numeric", month: "long", year: "numeric"
+      }).format(now);
+      updateSummary(now);
+    }
+
+    function nextAction() {
+      if (records.length === 0 || records[records.length - 1].label === "Saída") return "Entrada";
+      const lastActionIndex = sequence.indexOf(records[records.length - 1].label);
+      return sequence[lastActionIndex + 1] || null;
+    }
+
+    function refreshButtons() {
+      const next = nextAction();
+      Object.entries(buttons).forEach(([action, button]) => {
+        button.disabled = action !== next || !currentUser;
+      });
+      const labels = {
+        "Entrada": "Aguardando início da jornada",
+        "Saída para almoço": "Jornada em andamento",
+        "Volta do almoço": "Em intervalo",
+        "Saída": "Jornada em andamento",
+        null: "Jornada encerrada"
+      };
+      document.getElementById("statusText").textContent = labels[next] || labels[null];
+    }
+
+    function dateKey(date) {
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    }
+
+    function formatBalance(minutes) {
+      const sign = minutes >= 0 ? "+" : "-";
+      const absolute = Math.abs(Math.trunc(minutes));
+      return `${sign}${pad(Math.floor(absolute / 60))}:${pad(absolute % 60)}`;
+    }
+
+    function renderRecords() {
+      const body = document.getElementById("recordsBody");
+      const todayRecords = records.filter(record => dateKey(record.date) === dateKey(new Date()));
+      if (todayRecords.length === 0) {
+        body.innerHTML = '<tr><td class="empty" colspan="2">Nenhum registro realizado ainda.</td></tr>';
+        return;
+      }
+      body.innerHTML = todayRecords.map(record =>
+        `<tr><td>${record.label}</td><td>${record.time}</td></tr>`
+      ).join("");
+    }
+
+    function updateSummary(now = new Date()) {
+      const days = new Map();
+      let workStart = null;
+      let lunchStart = null;
+
+      records.forEach(record => {
+        const key = dateKey(record.date);
+        if (!days.has(key)) days.set(key, { workedMs: 0, lunchMs: 0 });
+        const day = days.get(key);
+
+        if (record.label === "Entrada") {
+          workStart = record.date;
+        } else if (record.label === "Saída para almoço" && workStart) {
+          day.workedMs += record.date - workStart;
+          workStart = null;
+          lunchStart = record.date;
+        } else if (record.label === "Volta do almoço") {
+          if (lunchStart) day.lunchMs += record.date - lunchStart;
+          lunchStart = null;
+          workStart = record.date;
+        } else if (record.label === "Saída" && workStart) {
+          day.workedMs += record.date - workStart;
+          workStart = null;
+        }
+      });
+
+      const todayKey = dateKey(now);
+      if (!days.has(todayKey)) days.set(todayKey, { workedMs: 0, lunchMs: 0 });
+      if (workStart) days.get(dateKey(workStart)).workedMs += now - workStart;
+      if (lunchStart) days.get(dateKey(lunchStart)).lunchMs += now - lunchStart;
+
+      const today = days.get(todayKey);
+      document.getElementById("workedTime").textContent = formatDuration(today.workedMs);
+      document.getElementById("lunchTime").textContent = formatDuration(today.lunchMs);
+
+      const targetMinutes = Math.max(0, Number(document.getElementById("dailyTarget").value) || 0) * 60;
+      const dailyBalance = today.workedMs / 60000 - targetMinutes;
+      const totalBalance = [...days.values()].reduce((total, day) => total + day.workedMs / 60000 - targetMinutes, 0);
+
+      const dailyBalanceElement = document.getElementById("dailyBalance");
+      const totalBalanceElement = document.getElementById("totalBalance");
+      dailyBalanceElement.textContent = formatBalance(dailyBalance);
+      totalBalanceElement.textContent = formatBalance(totalBalance);
+      dailyBalanceElement.className = `metric-value ${dailyBalance >= 0 ? "balance-positive" : "balance-negative"}`;
+      totalBalanceElement.className = `metric-value ${totalBalance >= 0 ? "balance-positive" : "balance-negative"}`;
+
+      const body = document.getElementById("balanceBody");
+      const sortedDays = [...days.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+      body.innerHTML = sortedDays.map(([key, day]) => {
+        const target = targetMinutes;
+        const balance = day.workedMs / 60000 - target;
+        const [year, month, date] = key.split("-");
+        const displayDate = `${date}/${month}/${year}`;
+        return `<tr><td>${displayDate}</td><td>${formatDuration(day.workedMs)}</td><td>${formatDuration(target * 60000)}</td><td class="${balance >= 0 ? "balance-positive" : "balance-negative"}">${formatBalance(balance)}</td></tr>`;
+      }).join("");
+    }
+
+    Object.entries(buttons).forEach(([action, button]) => {
+      button.addEventListener("click", async () => {
+        if (action !== nextAction() || !currentUser) return;
+        button.disabled = true;
+        const { data, error } = await sb
+          .from("registros_ponto")
+          .insert({ tipo: action, user_id: currentUser.id })
+          .select("tipo, registrado_em")
+          .single();
+        if (error) {
+          alert("Erro ao salvar: " + error.message);
+          refreshButtons();
+          return;
+        }
+        const date = new Date(data.registrado_em);
+        records.push({ label: data.tipo, date, time: formatTime(date) });
+        renderRecords();
+        refreshButtons();
+        updateSummary(date);
+      });
+    });
+
+    document.getElementById("dailyTarget").addEventListener("input", () => updateSummary());
+    refreshButtons();
+    renderRecords();
+    updateClock();
+    initAuth();
+    setInterval(() => {
+      updateClock();
+      renderRecords();
+    }, 1000);
+  </script>
+</body>
+</html>
